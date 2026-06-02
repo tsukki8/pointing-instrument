@@ -52,9 +52,9 @@ for i in range(1, len(gyro)):
     omega_y.append(Omega[0,2])
     omega_z.append(Omega[1,0])
 
-#omega_x = [0] + omega_x
-#omega_y = [0] + omega_y
-#omega_z = [0] + omega_z
+omega_x = [0] + omega_x
+omega_y = [0] + omega_y
+omega_z = [0] + omega_z
 
 # helper func applying same axis formatting to all subplots
 def format(ax, ylabel, title, legend=False):
@@ -72,6 +72,49 @@ def save(fig, folder, name):
     fig.savefig(path, dpi=300)
     plt.close(fig)
     print(f"Saved {name} plot to: {path}")
+
+# === orientation ===
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.plot(time, roll, label="Roll")
+ax.plot(time, pitch, label="Pitch")
+ax.plot(time, yaw, label="Yaw")
+format(ax, "Radians", "Euler Angles (rad) vs Time", legend=True)
+plt.tight_layout()
+save(fig, folders["orientation"], "orientation")
+
+# === angular velocity ===
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.plot(time, omega_x, label="ωx")
+ax.plot(time, omega_y, label="ωy")
+ax.plot(time, omega_z, label="ωz")
+ax.set_ylim(-1, 1)
+format(ax, "rad/s", "Angular Velocity (rad/s) vs Time", legend=True)
+plt.tight_layout()
+save(fig, folders["angular_velocity"], "angular_velocity")
+
+# === accelerometer (gravity) ===
+fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+axs[0].plot(time, gx, label="gx")
+axs[0].plot(time, gy, label="gy")
+axs[0].plot(time, gz, label="gz")
+format(axs[0], "g", "Gravity Components (normalized) vs Time", legend=True)
+axs[1].plot(time, g_mag)
+axs[1].set_ylim(0.999999, 1.000001)
+format(axs[1], "g", "Gravity Magnitude (normalized) vs Time", legend=False)
+plt.tight_layout()
+save(fig, folders["accelerometer"], "accelerometer")
+
+# === magnetometer ===
+fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+axs[0].plot(time, mx, label="mx")
+axs[0].plot(time, my, label="my")
+axs[0].plot(time, mz, label="mz")
+format(axs[0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($|\hat{B}|$) vs Time", legend=True)
+axs[1].plot(time, mag_mag)
+axs[1].set_ylim(0.999999, 1.000001)
+format(axs[1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
+plt.tight_layout()
+save(fig, folders["magnetometer"], "magnetometer")
 
 # === dashboard (3x2) ===
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), sharex=True)
@@ -94,7 +137,6 @@ axs[1,0].plot(time, gx, label="gx")
 axs[1,0].plot(time, gy, label="gy")
 axs[1,0].plot(time, gz, label="gz")
 format(axs[1, 0], "g", "Gravity Components (normalized) vs Time", legend=True)
-
 # Gravity magnitude
 axs[1,1].plot(time, g_mag)
 axs[1,1].set_ylim(0.999999, 1.000001)
@@ -105,7 +147,6 @@ axs[2,0].plot(time, mx, label="mx")
 axs[2,0].plot(time, my, label="my")
 axs[2,0].plot(time, mz, label="mz")
 format(axs[2, 0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($|\hat{B}|$) vs Time", legend=True)
-
 # Magnetometer magnitude
 axs[2,1].plot(time, mag_mag)
 axs[2,1].set_ylim(0.999999, 1.000001)
