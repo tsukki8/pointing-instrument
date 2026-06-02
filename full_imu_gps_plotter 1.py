@@ -3,11 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-# =========================
-# FILE PATHS
-# =========================
-file_path = r"C:\Users\Zachary\Documents\Thesis\imu_logs\imu_gps_20260504_173241.jsonl"
-base_output = r"C:\Users\Zachary\Documents\Thesis\IMU_graphs"
+# === updated file paths ===
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260529_160243.jsonl")
+base_output = os.path.join(BASE_DIR, "imu_graphs")
 
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -22,18 +21,14 @@ folders = {
 for f in folders.values():
     os.makedirs(f, exist_ok=True)
 
-# =========================
-# LOAD DATA
-# =========================
+# === load data ===
 df = pd.read_json(file_path, lines=True)
 df["gps_time"] = pd.to_datetime(df["gps_time"], errors="coerce")
 df = df.dropna(subset=["gps_time"])
 
 time = df["gps_time"]
 
-# =========================
-# DATA EXTRACTION
-# =========================
+# === data extraction ===
 roll, pitch, yaw = df["roll"], df["pitch"], df["yaw"]
 
 mag = np.vstack(df["mag"])
@@ -70,12 +65,10 @@ omega_x = [0] + omega_x
 omega_y = [0] + omega_y
 omega_z = [0] + omega_z
 
-# =========================
-# DASHBOARD (3x2)
-# =========================
+# === dashboard (3x2) ===
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), sharex=True)
 
-# Euler
+# === Euler ===
 axs[0,0].plot(time, roll, label="Roll")
 axs[0,0].plot(time, pitch, label="Pitch")
 axs[0,0].plot(time, yaw, label="Yaw")
@@ -84,7 +77,7 @@ axs[0,0].set_ylabel("Radians")
 axs[0,0].legend()
 axs[0,0].grid()
 
-# Angular velocity
+# === Angular velocity ===
 axs[0,1].plot(time, omega_x, label="ωx")
 axs[0,1].plot(time, omega_y, label="ωy")
 axs[0,1].plot(time, omega_z, label="ωz")
@@ -94,7 +87,7 @@ axs[0,1].legend()
 axs[0,1].grid()
 axs[0,1].set_ylim(-1, 1)
 
-# Gravity components
+# === Gravity components ===
 axs[1,0].plot(time, gx, label="gx")
 axs[1,0].plot(time, gy, label="gy")
 axs[1,0].plot(time, gz, label="gz")
@@ -103,14 +96,14 @@ axs[1,0].set_ylabel("g")
 axs[1,0].legend()
 axs[1,0].grid()
 
-# Gravity magnitude
+# === Gravity magnitude ===
 axs[1,1].plot(time, g_mag)
 axs[1,1].set_title("Gravity Magnitude (normalized) vs Time")
 axs[1,1].set_ylabel("g")
 axs[1,1].grid()
 axs[1,1].set_ylim(0.999999, 1.000001)
 
-# Magnetometer components
+# === Magnetometer components ===
 axs[2,0].plot(time, mx, label="mx")
 axs[2,0].plot(time, my, label="my")
 axs[2,0].plot(time, mz, label="mz")
@@ -119,16 +112,14 @@ axs[2,0].set_ylabel(r"$\hat{B} = \frac{B}{|B|}$")
 axs[2,0].legend()
 axs[2,0].grid()
 
-# Magnetometer magnitude
+# === Magnetometer magnitude ===
 axs[2,1].plot(time, mag_mag)
 axs[2,1].set_title(r"Magnetic Field Magnitude $|\hat{B}|$ (normalized) vs Time")
 axs[2,1].set_ylabel(r"$\hat{B} = \frac{B}{|B|}$")
 axs[2,1].grid()
 axs[2,1].set_ylim(0.999999, 1.000001)
 
-# =========================
-# FIX: consistent diagonal labels + keep UTC label
-# =========================
+# === FIX: consistent diagonal labels + keep UTC label ===
 for ax in axs.flat:
     ax.set_xlabel("UTC ")        # <-- keeps your original label
     ax.tick_params(axis='x', labelrotation=30)
