@@ -76,67 +76,39 @@ def save(fig, folder, name):
 # === dashboard (3x2) ===
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), sharex=True)
 
-# === Euler ===
+# Euler angles
 axs[0,0].plot(time, roll, label="Roll")
 axs[0,0].plot(time, pitch, label="Pitch")
 axs[0,0].plot(time, yaw, label="Yaw")
-axs[0,0].set_title("Euler Angles (rad) vs Time")
-axs[0,0].set_ylabel("Radians")
-axs[0,0].legend()
-axs[0,0].grid()
+format(axs[0, 0], "Radians", "Euler Angles (rad) vs Time", legend=True)
 
-# === Angular velocity ===
+# Angular velocity
 axs[0,1].plot(time, omega_x, label="ωx")
 axs[0,1].plot(time, omega_y, label="ωy")
 axs[0,1].plot(time, omega_z, label="ωz")
-axs[0,1].set_title("Angular Velocity (rad/s) vs Time")
-axs[0,1].set_ylabel("rad/s")
-axs[0,1].legend()
-axs[0,1].grid()
 axs[0,1].set_ylim(-1, 1)
+format(axs[0, 1], "rad/s", "Angular Velocity (rad/s) vs Time", legend=True)
 
-# === Gravity components ===
+# Gravity components
 axs[1,0].plot(time, gx, label="gx")
 axs[1,0].plot(time, gy, label="gy")
 axs[1,0].plot(time, gz, label="gz")
-axs[1,0].set_title("Gravity Components (normalized) vs Time")
-axs[1,0].set_ylabel("g")
-axs[1,0].legend()
-axs[1,0].grid()
+format(axs[1, 0], "g", "Gravity Components (normalized) vs Time", legend=True)
 
-# === Gravity magnitude ===
+# Gravity magnitude
 axs[1,1].plot(time, g_mag)
-axs[1,1].set_title("Gravity Magnitude (normalized) vs Time")
-axs[1,1].set_ylabel("g")
-axs[1,1].grid()
 axs[1,1].set_ylim(0.999999, 1.000001)
+format(axs[1, 1], "g", "Gravity Magnitude (normalized) vs Time", legend=False)
 
-# === Magnetometer components ===
+# Magnetometer components
 axs[2,0].plot(time, mx, label="mx")
 axs[2,0].plot(time, my, label="my")
 axs[2,0].plot(time, mz, label="mz")
-axs[2,0].set_title(r"Magnetic Field Vector Components $|\hat{B}|$ vs Time")
-axs[2,0].set_ylabel(r"$\hat{B} = \frac{B}{|B|}$")
-axs[2,0].legend()
-axs[2,0].grid()
+format(axs[2, 0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($|\hat{B}|$) vs Time", legend=True)
 
-# === Magnetometer magnitude ===
+# Magnetometer magnitude
 axs[2,1].plot(time, mag_mag)
-axs[2,1].set_title(r"Magnetic Field Magnitude $|\hat{B}|$ (normalized) vs Time")
-axs[2,1].set_ylabel(r"$\hat{B} = \frac{B}{|B|}$")
-axs[2,1].grid()
 axs[2,1].set_ylim(0.999999, 1.000001)
+format(axs[2, 1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
 
-# === FIX: consistent diagonal labels + keep UTC label ===
-for ax in axs.flat:
-    ax.set_xlabel("UTC ")        # <-- keeps your original label
-    ax.tick_params(axis='x', labelrotation=30)
-
-plt.tight_layout()
-
-# save config populates the dashboard folder w plots
-#dashboard_path = os.path.join(folders["dashboard"], f"{file_name}_dashboard.png")
-#plt.savefig(dashboard_path, dpi=300)
-#plt.close()
-
-print("Dashboard saved to:", dashboard_path)
+save(fig, folders["dashboard"], "dashboard")
