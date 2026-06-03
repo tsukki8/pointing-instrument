@@ -5,7 +5,7 @@ import os
 
 # === updated file paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260529_160243.jsonl")
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260602_190505.jsonl")
 base_output = os.path.join(BASE_DIR, "imu_graphs")
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -14,6 +14,7 @@ folders = {
     "angular_velocity": os.path.join(base_output, "angular_velocity"),
     "accelerometer": os.path.join(base_output, "accelerometer"),
     "magnetometer": os.path.join(base_output, "magnetometer"),
+    "gps": os.path.join(base_output, "gps"),
     "dashboard": os.path.join(base_output, "dashboard"),
 }
 for f in folders.values():
@@ -51,10 +52,11 @@ for i in range(1, len(gyro)):
     omega_x.append(Omega[2,1])
     omega_y.append(Omega[0,2])
     omega_z.append(Omega[1,0])
-
 omega_x = [0] + omega_x
 omega_y = [0] + omega_y
 omega_z = [0] + omega_z
+
+lon, lat = df["gps_lon"], df["gps_lat"]
 
 # helper func applying same axis formatting to all subplots
 def format(ax, ylabel, title, legend=False):
@@ -115,6 +117,14 @@ axs[1].set_ylim(0.999999, 1.000001)
 format(axs[1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
 plt.tight_layout()
 save(fig, folders["magnetometer"], "magnetometer")
+
+# === GPS ===
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.plot(time, lon, label="Longitude")
+ax.plot(time, lat, label="Latitude")
+format(ax, "Degrees", "GPS Coordinates vs Time", legend=True)
+plt.tight_layout()
+save(fig, folders["gps"], "gps")
 
 # === dashboard (3x2) ===
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), sharex=True)
