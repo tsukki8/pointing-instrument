@@ -68,6 +68,15 @@ def format(ax, ylabel, title, legend=False):
     if legend:
         ax.legend()
 
+# helper fun applying axes formatting for histograms
+def format_hist(ax, xlabel, title, legend=False):
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Count")
+    ax.grid()
+    if legend:
+        ax.legend()
+
 # helper func to save individual plots to ea folder
 def save(fig, folder, name):
     path = os.path.join(folder, f"{file_name}_{name}.png")
@@ -126,7 +135,7 @@ format(ax, "Degrees", "GPS Coordinates vs Time", legend=True)
 plt.tight_layout()
 save(fig, folders["gps"], "gps")
 
-# === dashboard (3x2) ===
+# === dashboard (3x2) of linear plots to show noise characteristics ===
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), sharex=True)
 
 # Euler angles
@@ -162,4 +171,25 @@ axs[2,1].plot(time, mag_mag)
 axs[2,1].set_ylim(0.999999, 1.000001)
 format(axs[2, 1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
 
-save(fig, folders["dashboard"], "dashboard")
+save(fig, folders["dashboard"], "linear_plots")
+
+# === histograms to evaluate noise trends: skew, outliers, acceptable ranges ===
+fig, axs = plt.subplots(2, 2, figsize=(15, 12))
+
+for data, label in zip([roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
+    axs[0,0].hist(data, bins=50, alpha=0.6, label=label)
+format_hist(axs[0, 0], "Radians", "Euler Angles Distribution (roll, pitch, yaw)", legend=True)
+
+for data, label in zip([omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
+    axs[0,1].hist(data, bins=50, alpha=0.6, label=label)
+format_hist(axs[0, 1], "rad/s", "Angular Velocity Distribution (ωx, ωy, ωz)", legend=True)
+
+for data, label in zip([gx, gy, gz], ["gx", "gy", "gz"]):
+    axs[1,0].hist(data, bins=50, alpha=0.6, label=label)
+format_hist(axs[1, 0], "g", "Gravity Components Distribution (gx, gy, gz)", legend=True)
+
+for data, label in zip([mx, my, mz], ["mx", "my", "mz"]):
+    axs[1,1].hist(data, bins=50, alpha=0.6, label=label)
+format_hist(axs[1, 1], r"($|\hat{B}|$)", "Magnetic Field Components Distribution", legend=True)
+
+save(fig, folders["dashboard"], "histograms")
