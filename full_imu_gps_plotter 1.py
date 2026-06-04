@@ -68,6 +68,15 @@ def format(ax, ylabel, title, legend=False):
     if legend:
         ax.legend()
 
+# helper fun applying axes formatting for histograms
+def format_hist(ax, xlabel, title, legend=False):
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Count")
+    ax.grid()
+    if legend:
+        ax.legend()
+
 # helper func to save individual plots to ea folder
 def save(fig, folder, name):
     path = os.path.join(folder, f"{file_name}_{name}.png")
@@ -169,22 +178,18 @@ fig, axs = plt.subplots(2, 2, figsize=(15, 12))
 
 for data, label in zip([roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
     axs[0,0].hist(data, bins=50, alpha=0.6, label=label)
-axs[0,0].legend()
-format(axs[0, 0], "Count", "Euler Angles (rad) Distribution (roll, pitch, yaw)", legend=True)
+format_hist(axs[0, 0], "Radians", "Euler Angles Distribution (roll, pitch, yaw)", legend=True)
 
 for data, label in zip([omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
     axs[0,1].hist(data, bins=50, alpha=0.6, label=label)
-axs[0,1].legend()
-format(axs[0, 1], "Count", "Angular Velocity (rad/s) Distribution (ωx, ωy, ωz)", legend=True)
+format_hist(axs[0, 1], "rad/s", "Angular Velocity Distribution (ωx, ωy, ωz)", legend=True)
 
 for data, label in zip([gx, gy, gz], ["gx", "gy", "gz"]):
     axs[1,0].hist(data, bins=50, alpha=0.6, label=label)
-axs[1,0].legend()
-format(axs[1, 0], "Count", "Gravity Components Distribution (gx, gy, gz)", legend=True)
+format_hist(axs[1, 0], "g", "Gravity Components Distribution (gx, gy, gz)", legend=True)
 
 for data, label in zip([mx, my, mz], ["mx", "my", "mz"]):
     axs[1,1].hist(data, bins=50, alpha=0.6, label=label)
-axs[1,1].legend()
-format(axs[1, 1], "Count", r"Magnetic Field Components ($|\hat{B}|$) Distribution", legend=True)
+format_hist(axs[1, 1], r"($|\hat{B}|$)", "Magnetic Field Components Distribution", legend=True)
 
 save(fig, folders["dashboard"], "histograms")
