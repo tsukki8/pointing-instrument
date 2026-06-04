@@ -1,0 +1,3 @@
+echo "imu_logs/" >> .gitignore
+echo "imu_graphs/" >> .gitignore
+echo "venv/" >> .gitignore
