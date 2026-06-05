@@ -5,7 +5,7 @@ import os
 
 # === updated file paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260602_190505.jsonl")
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260529_160243.jsonl")
 base_output = os.path.join(BASE_DIR, "imu_graphs")
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -68,7 +68,7 @@ def format(ax, ylabel, title, legend=False):
     if legend:
         ax.legend()
 
-# helper fun applying axes formatting for histograms
+# helper func applying axes formatting for histograms
 def format_hist(ax, xlabel, title, legend=False):
     ax.set_title(title)
     ax.set_xlabel(xlabel)
