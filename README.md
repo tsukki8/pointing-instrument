@@ -29,6 +29,7 @@ and renders generated plots in real time.
 
 ```bash
 cd /home/pi/pointing-instrument
+source venv/bin/activate
 pip install flask flask-cors          # or: pip install -r requirements.txt
 python3 app.py
 ```
