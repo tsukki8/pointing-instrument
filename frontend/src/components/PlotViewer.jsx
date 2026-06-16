@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { api, apiUrl } from '../api.js';
-"""
-const FOLDERS = ['orientation', 'angular_velocity', 'accelerometer', 'magnetometer', 'gps', 'dashboard'];"""
 
 export default function PlotViewer({ plotsVersion }) {
   const [active, setActive] = useState(null);
