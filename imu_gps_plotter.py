@@ -193,3 +193,68 @@ for data, label in zip([mx, my, mz], ["mx", "my", "mz"]):
 format_hist(axs[1, 1], r"($|\hat{B}|$)", "Magnetic Field Components Distribution", legend=True)
 
 save(fig, folders["dashboard"], "histograms")
+
+# histograms of only roll
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(roll, bins=50, alpha=0.6, label="Roll")
+format_hist(ax, "Radians", "Roll Distribution", legend=True)
+save(fig, folders["orientation"], "roll_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(pitch, bins=50, alpha=0.6, label="Pitch")
+format_hist(ax, "Radians", "Pitch Distribution", legend=True)
+save(fig, folders["orientation"], "pitch_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(yaw, bins=50, alpha=0.6, label="Yaw")
+format_hist(ax, "Radians", "Yaw Distribution", legend=True)
+save(fig, folders["orientation"], "yaw_histogram")
+
+# histograms of only ωx
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(omega_x, bins=50, alpha=0.6, label="ωx")
+format_hist(ax, "rad/s", "ωx Distribution", legend=True)
+save(fig, folders["angular_velocity"], "omega_x_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(omega_y, bins=50, alpha=0.6, label="ωy")
+format_hist(ax, "rad/s", "ωy Distribution", legend=True)
+save(fig, folders["angular_velocity"], "omega_y_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(omega_z, bins=50, alpha=0.6, label="ωz")
+format_hist(ax, "rad/s", "ωz Distribution", legend=True)
+save(fig, folders["angular_velocity"], "omega_z_histogram")
+
+# histograms of only gx
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(gx, bins=50, alpha=0.6, label="gx")
+format_hist(ax, "g", "gx Distribution", legend=True)
+save(fig, folders["accelerometer"], "gx_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(gy, bins=50, alpha=0.6, label="gy")
+format_hist(ax, "g", "gy Distribution", legend=True)
+save(fig, folders["accelerometer"], "gy_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(gz, bins=50, alpha=0.6, label="gz")
+format_hist(ax, "g", "gz Distribution", legend=True)
+save(fig, folders["accelerometer"], "gz_histogram")
+
+# histograms of only mx
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(mx, bins=50, alpha=0.6, label="mx")
+format_hist(ax, r"($|\hat{B}|$)", "mx Distribution", legend=True)
+save(fig, folders["magnetometer"], "mx_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(my, bins=50, alpha=0.6, label="my")
+format_hist(ax, r"($|\hat{B}|$)", "my Distribution", legend=True)
+save(fig, folders["magnetometer"], "my_histogram")
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.hist(mz, bins=50, alpha=0.6, label="mz")
+format_hist(ax, r"($|\hat{B}|$)", "mz Distribution", legend=True)
+save(fig, folders["magnetometer"], "mz_histogram")
+
