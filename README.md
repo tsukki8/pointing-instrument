@@ -24,11 +24,15 @@ and renders generated plots in real time.
     ├── package.json
     └── .env.example
 ```
+## UML diagram
+<img width="2910" height="1374" alt="UML Diagram (1)" src="https://github.com/user-attachments/assets/e9cbe91a-daa1-4a2a-9bde-d7fd9dc8ce2b" />
+
 
 ## Run the backend on the Pi
 
 ```bash
 cd /home/pi/pointing-instrument
+source venv/bin/activate
 pip install flask flask-cors          # or: pip install -r requirements.txt
 python3 app.py
 ```
