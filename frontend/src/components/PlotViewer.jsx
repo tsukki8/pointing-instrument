@@ -35,20 +35,20 @@ export default function PlotViewer({ plotsVersion }) {
   return (
     <section className="plot-viewer">
       <div className="tabs">
-        {folders.map((f) => {
+        {folders.map((f) => (
             <button
               key={f}
               className={`tab ${f === active ? 'active' : ''}`}
               onClick={() => setActive(f)}
             >
-              {f.replace(/ _/g, ' ')}
+              {f.replace(/_/g, ' ')}
               <span className="count">{(plots[f] || []).length}</span>
             </button>
-        })}
+        ))}
       </div>
       {error && <div className="error">{error}</div>}
       {items.length === 0 ? (
-        <div className="empty">No plots in {active.replace('_', ' ')} yet.</div>
+        <div className="empty">No plots in {active?.replace('_', ' ')} yet.</div>
       ) : (
         <div className="image-grid">
           {items.map((img) => {
