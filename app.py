@@ -18,7 +18,7 @@ PLOT_DIR = BASE_DIR / "imu_graphs"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
 
 LOGGER_SCRIPT = BASE_DIR / "imu_gps_logger5.py"
-PLOTTER_SCRIPT = BASE_DIR / "full_imu_gps_plotter 1.py"
+PLOTTER_SCRIPT = BASE_DIR / "imu_gps_plotter.py"
 
 PLOT_FOLDERS = [
     "orientation",
