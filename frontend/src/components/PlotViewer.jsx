@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api, apiUrl } from '../api.js';
-
-const FOLDERS = ['orientation', 'angular_velocity', 'accelerometer', 'magnetometer', 'gps', 'dashboard'];
+"""
+const FOLDERS = ['orientation', 'angular_velocity', 'accelerometer', 'magnetometer', 'gps', 'dashboard'];"""
 
 export default function PlotViewer({ plotsVersion }) {
-  const [active, setActive] = useState(FOLDERS[0]);
+  const [active, setActive] = useState(null);
   const [plots, setPlots] = useState({});
   const [lightbox, setLightbox] = useState(null);
   const [error, setError] = useState(null);
@@ -13,12 +13,13 @@ export default function PlotViewer({ plotsVersion }) {
     let cancelled = false;
     api('/plots')
       .then((data) => {
-        if (!cancelled) setPlots(data);
+        if (cancelled) return;
+        setPlots(data);
+        const folders = Object.keys(data);
+        setActive(prev => prev && folders.includes(prev) ? prev : folders[0] || null);
       })
       .catch((e) => setError(String(e.message || e)));
-    return () => {
-      cancelled = true;
-    };
+    return () => {cancelled = true; };
   }, [plotsVersion]);
 
   useEffect(() => {
@@ -30,23 +31,21 @@ export default function PlotViewer({ plotsVersion }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [lightbox]);
 
-  const items = plots[active] || [];
+  const folders = Object.keys(plots);
+  const items = (active && plots[active]) || [];
 
   return (
     <section className="plot-viewer">
       <div className="tabs">
-        {FOLDERS.map((f) => {
-          const count = (plots[f] || []).length;
-          return (
+        {folders.map((f) => {
             <button
               key={f}
               className={`tab ${f === active ? 'active' : ''}`}
               onClick={() => setActive(f)}
             >
-              {f.replace('_', ' ')}
-              <span className="count">{count}</span>
+              {f.replace(/ _/g, ' ')}
+              <span className="count">{(plots[f] || []).length}</span>
             </button>
-          );
         })}
       </div>
       {error && <div className="error">{error}</div>}
