@@ -5,7 +5,7 @@ import os
 
 # === updated file paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260529_160243.jsonl")
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_210751.jsonl")
 base_output = os.path.join(BASE_DIR, "imu_graphs")
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -173,6 +173,7 @@ format(axs[2, 1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\h
 
 save(fig, folders["dashboard"], "linear_plots")
 
+'''
 # === histograms to evaluate noise trends: skew, outliers, acceptable ranges ===
 fig, axs = plt.subplots(2, 2, figsize=(15, 12))
 
@@ -257,4 +258,31 @@ fig, ax = plt.subplots(figsize=(10, 6))
 ax.hist(mz, bins=50, alpha=0.6, label="mz")
 format_hist(ax, r"($|\hat{B}|$)", "mz Distribution", legend=True)
 save(fig, folders["magnetometer"], "mz_histogram")
+'''
+fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+for ax, data, label in zip(axs, [roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
+    ax.hist(data, bins=50, alpha=0.6, label=label)
+    format_hist(ax, "Radians", f"{label} Distribution", legend=True)
+plt.tight_layout()
+save(fig, folders["dashboard"], "histograms_orientation")
 
+fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+for ax, data, label in zip(axs, [omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
+    ax.hist(data, bins=50, alpha=0.6, label=label)
+    format_hist(ax, "rad/s", f"{label} Distribution", legend=True)
+plt.tight_layout()
+save(fig, folders["dashboard"], "histograms_angular_velocity")
+
+fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+for ax, data, label in zip(axs, [gx, gy, gz], ["gx", "gy", "gz"]):
+    ax.hist(data, bins=50, alpha=0.6, label=label)
+    format_hist(ax, "g", f"{label} Distribution", legend=True)
+plt.tight_layout()
+save(fig, folders["dashboard"], "histograms_accelerometer")
+
+fig, axs = plt.subplots(1, 3, figsize=(15, 4))
+for ax, data, label in zip(axs, [mx, my, mz], ["mx", "my", "mz"]):
+    ax.hist(data, bins=50, alpha=0.6, label=label)
+    format_hist(ax, r"($|\hat{B}|$)", f"{label} Distribution", legend=True)
+plt.tight_layout()
+save(fig, folders["dashboard"], "histograms_magnetometer")
