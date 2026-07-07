@@ -59,7 +59,7 @@ class LoggerManager:
         with self.lock:
             return self.proc is not None and self.proc.poll() is None
 
-    def start(self) -> bool:
+    def start(self) -> bool:b
         with self.lock:
             if self.proc is not None and self.proc.poll() is None:
                 return False
@@ -196,6 +196,8 @@ class PlotterManager:
         with self.lock:
             running = self.proc is not None and self.proc.poll() is None
             return {"running": running, "done": self.done, "error": self.error}
+
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".fits", ".fit", ".fts"}    
 
 logger_mgr = LoggerManager()
 plotter_mgr = PlotterManager()
