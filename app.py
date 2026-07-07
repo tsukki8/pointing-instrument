@@ -2,11 +2,15 @@
 """Flask backend controls the IMU/GPS logger and plotter subprocesses, streams logger stdout
 over Server-Sent Events, and outputs generated plot images and log metadata."""
 
+import json
 import os
 import queue
+import shutil
+import time
 import signal   
 import subprocess
 import sys
+import tempfile
 import threading
 from pathlib import Path
 from flask import Flask, Response, jsonify, request, send_from_directory, abort
@@ -16,6 +20,11 @@ BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "imu_logs"
 PLOT_DIR = BASE_DIR / "imu_graphs"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+
+#new for plate solving
+SOLVER_DIR = BASE_DIR / "plate_solver"
+SOLVE_IMAGES_DIR = SOLVER_DIR / "plate_images"
+SOLVE_HISTORY_FILE = SOLVER_DIR / "solve_history.jsonl"
 
 LOGGER_SCRIPT = BASE_DIR / "imu_gps_logger5.py"
 PLOTTER_SCRIPT = BASE_DIR / "imu_gps_plotter.py"
@@ -32,6 +41,9 @@ PLOT_FOLDERS = [
 LOG_DIR.mkdir(exist_ok=True)
 for _sub in PLOT_FOLDERS:
     (PLOT_DIR / _sub).mkdir(parents=True, exist_ok=True)
+SOLVER_DIR.mkdir(exist_ok=True) # make dir for plate solving if dne
+SOLVE_IMAGES_DIR.mkdir(exist_ok=True)
+SOLVE_HISTORY_FILE.touch(exist_ok=True)
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIST), static_url_path="")
 CORS(app)
