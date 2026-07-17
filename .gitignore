@@ -1,4 +1,20 @@
-echo "imu_logs/" >> .gitignore
-echo "*.jsonl" >> .gitignore
-echo "imu_graphs/" >> .gitignore
-echo "venv/" >> .gitignore
+# Runtime data & generated output
+imu_logs/
+imu_graphs/
+*.jsonl
+
+# Plate solver runtime data (auto-created by app.py)
+plate_solver/plate_images/
+plate_solver/plate_solves/
+plate_solver/solve_history.jsonl
+
+# Python
+__pycache__/
+*.pyc
+venv/
+venv311/
+.venv/
+
+# Misc
+.DS_Store
+.Rhistory
