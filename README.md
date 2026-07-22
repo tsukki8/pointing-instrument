@@ -18,7 +18,9 @@ and renders generated plots in real time.
 │   ├── angular_velocity/
 │   ├── accelerometer/
 │   ├── magnetometer/
+|   ├── gps/
 │   └── dashboard/
+├── plate_solver/ 
 └── frontend/                     # React + Vite single-page app
     ├── src/
     ├── package.json
@@ -41,15 +43,6 @@ The backend listens on `http://<pi-ip>:5000`.
 
 ```bash
 python3 "full_imu_gps_plotter 1.py" <log_path> <imu_graphs_dir>
-```
-
-The plotter currently has hard-coded Windows paths. Replace its top section
-with:
-
-```python
-import sys, os
-file_path  = sys.argv[1]
-base_output = sys.argv[2]
 ```
 
 ## Run the frontend on your local machine
