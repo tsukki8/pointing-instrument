@@ -303,41 +303,44 @@ class PlateSolveJob:
     def run(self) -> None:
         self.started_at = time.time()
         self.status = "running"
- 
-        # fail fast before Popen so the error is clean
-        solve_bin = shutil.which("solve-field")
-        if solve_bin is None:
-            self._fail(
-                "solve-field not found on PATH. "
-                "Run: sudo apt install astrometry.net astrometry-data-tycho2"
-            )
-            return
- 
-        work = SOLVE_WORK_DIR / self.job_id
-        work.mkdir(parents=True, exist_ok=True)
- 
-        cmd = [
-            solve_bin,
-            "--no-plots",
-            "--overwrite",
-            "--dir", str(work),
-            "--new-fits", "none",
-            "--no-remove-lines",
-            "--no-verify",
-        ]
-        if self.ra_hint is not None and self.dec_hint is not None:
-            cmd += ["--ra", str(self.ra_hint),
-                    "--dec", str(self.dec_hint),
-                    "--radius", str(self.radius_hint or 5.0)]
-        if self.scale_low is not None:
-            cmd += ["--scale-low", str(self.scale_low)]
-        if self.scale_high is not None:
-            cmd += ["--scale-high", str(self.scale_high)]
-        cmd.append(str(self.image_path))
- 
-        self.log_lines.append(f"$ {' '.join(cmd)}")
- 
+
         try:
+            # fail fast before Popen so the error is clean. Everything from
+            # here down is inside the try so that a failure in setup (missing
+            # binary, un-creatable work dir) marks the job failed rather than
+            # escaping run() and killing the manager's worker thread.
+            solve_bin = shutil.which("solve-field")
+            if solve_bin is None:
+                self._fail(
+                    "solve-field not found on PATH. "
+                    "Run: sudo apt install astrometry.net astrometry-data-tycho2"
+                )
+                return
+
+            work = SOLVE_WORK_DIR / self.job_id
+            work.mkdir(parents=True, exist_ok=True)
+
+            cmd = [
+                solve_bin,
+                "--no-plots",
+                "--overwrite",
+                "--dir", str(work),
+                "--new-fits", "none",
+                "--no-remove-lines",
+                "--no-verify",
+            ]
+            if self.ra_hint is not None and self.dec_hint is not None:
+                cmd += ["--ra", str(self.ra_hint),
+                        "--dec", str(self.dec_hint),
+                        "--radius", str(self.radius_hint or 5.0)]
+            if self.scale_low is not None:
+                cmd += ["--scale-low", str(self.scale_low)]
+            if self.scale_high is not None:
+                cmd += ["--scale-high", str(self.scale_high)]
+            cmd.append(str(self.image_path))
+
+            self.log_lines.append(f"$ {' '.join(cmd)}")
+
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -486,7 +489,20 @@ class PlateSolveManager:
                         self._event.clear()
                         break
                     job = self._queue.pop(0)
-                job.run()   # blocking; job updates its own status fields
+                # A failing job must never kill this thread — otherwise every
+                # job submitted afterwards sits at "queued" forever (the
+                # "infinite submitting" bug). run() is defensive on its own,
+                # but keep a backstop here so any escaping exception is turned
+                # into a failed job instead of a dead worker.
+                try:
+                    job.run()   # blocking; job updates its own status fields
+                except Exception as exc:
+                    job._fail(f"Unexpected worker error: {exc}")
+                    job.finished_at = time.time()
+                    try:
+                        _append_history(job._to_dict())
+                    except Exception:
+                        pass
 
 logger_mgr = LoggerManager()
 plotter_mgr = PlotterManager()

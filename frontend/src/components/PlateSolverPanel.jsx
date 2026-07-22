@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, apiUrl } from '../api.js';
 
+// Keys must match the status strings the backend actually emits:
+// queued, running, solved, failed. ("running" was previously mis-keyed as
+// "solving", so an in-progress job showed no status colour or spinner.)
 const STATUS_CLASS = {
   queued: 'ps-status-queued',
-  solving: 'ps-status-solving',
+  running: 'ps-status-solving',
   solved: 'ps-status-solved',
   failed: 'ps-status-failed',
   cancelled: 'ps-status-cancelled',
@@ -171,7 +174,7 @@ export default function PlateSolverPanel() {
 
   // shown detail: live poll result, else the row from the merged jobs list
   const shown = detail || jobs.find((j) => j.job_id === selectedId) || null;
-  const active = shown && (shown.status === 'queued' || shown.status === 'solving');
+  const active = shown && (shown.status === 'queued' || shown.status === 'running');
 
   return (
     <div className="ps-wrap">
@@ -250,7 +253,7 @@ export default function PlateSolverPanel() {
                       </td>
                       <td className="mono">{j.elapsed_s != null ? `${j.elapsed_s}s` : '—'}</td>
                       <td>
-                        {(j.status === 'queued' || j.status === 'solving') && (
+                        {(j.status === 'queued' || j.status === 'running') && (
                           <button
                             className="danger"
                             onClick={(e) => {
