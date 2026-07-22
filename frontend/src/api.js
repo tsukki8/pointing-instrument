@@ -3,9 +3,13 @@ const API = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 export const apiUrl = (path) => `${API}${path}`;
 
 export async function api(path, opts = {}) {
+  const isFormData = opts.body instanceof FormData;
   const res = await fetch(apiUrl(path), {
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
+    headers: {
+          ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+          ...(opts.headers || {}),
+    },  
   });
   if (!res.ok) {
     let body = '';
