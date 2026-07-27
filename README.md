@@ -13,26 +13,24 @@ and renders generated plots in real time.
 ├── imu_gps_logger5.py            # logger script for data collection and extraction
 ├── full_imu_gps_plotter 1.py     # plotter script for liner and histogram plotting
 ├── imu_logs/                     # *.jsonl produced by the logger
-├── imu_graphs/                   # PNGs produced by the plotter
+├── imu_graphs/                   # PNGs produced by the plotter in individual folders
 │   ├── orientation/
 │   ├── angular_velocity/
 │   ├── accelerometer/
 │   ├── magnetometer/
+|   ├── gps/
 │   └── dashboard/
+├── plate_solver/ 
 └── frontend/                     # React + Vite single-page app
     ├── src/
     ├── package.json
     └── .env.example
 ```
-## UML diagram
-<img width="2910" height="1374" alt="UML Diagram (1)" src="https://github.com/user-attachments/assets/e9cbe91a-daa1-4a2a-9bde-d7fd9dc8ce2b" />
-
 
 ## Run the backend on the Pi
 
 ```bash
 cd /home/pi/pointing-instrument
-source venv/bin/activate
 pip install flask flask-cors          # or: pip install -r requirements.txt
 python3 app.py
 ```
@@ -45,15 +43,6 @@ The backend listens on `http://<pi-ip>:5000`.
 
 ```bash
 python3 "full_imu_gps_plotter 1.py" <log_path> <imu_graphs_dir>
-```
-
-The plotter currently has hard-coded Windows paths. Replace its top section
-with:
-
-```python
-import sys, os
-file_path  = sys.argv[1]
-base_output = sys.argv[2]
 ```
 
 ## Run the frontend on your local machine

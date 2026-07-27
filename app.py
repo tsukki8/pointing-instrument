@@ -2,12 +2,17 @@
 """Flask backend controls the IMU/GPS logger and plotter subprocesses, streams logger stdout
 over Server-Sent Events, and outputs generated plot images and log metadata."""
 
+import json
 import os
 import queue
+import shutil
+import time
 import signal   
 import subprocess
 import sys
+import tempfile
 import threading
+import uuid
 from pathlib import Path
 from flask import Flask, Response, jsonify, request, send_from_directory, abort
 from flask_cors import CORS
@@ -16,6 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "imu_logs"
 PLOT_DIR = BASE_DIR / "imu_graphs"
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+
+#new for plate solving
+SOLVER_DIR = BASE_DIR / "plate_solver"
+SOLVE_IMAGES_DIR = SOLVER_DIR / "plate_images"
+SOLVE_HISTORY_FILE = SOLVER_DIR / "solve_history.jsonl"
+SOLVE_WORK_DIR = SOLVER_DIR / "jobs"  #per job
 
 LOGGER_SCRIPT = BASE_DIR / "imu_gps_logger5.py"
 PLOTTER_SCRIPT = BASE_DIR / "imu_gps_plotter.py"
@@ -32,6 +43,9 @@ PLOT_FOLDERS = [
 LOG_DIR.mkdir(exist_ok=True)
 for _sub in PLOT_FOLDERS:
     (PLOT_DIR / _sub).mkdir(parents=True, exist_ok=True)
+SOLVER_DIR.mkdir(exist_ok=True) # make dir for plate solving if dne
+SOLVE_IMAGES_DIR.mkdir(exist_ok=True)
+SOLVE_HISTORY_FILE.touch(exist_ok=True)
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIST), static_url_path="")
 CORS(app)
@@ -185,9 +199,316 @@ class PlotterManager:
             running = self.proc is not None and self.proc.poll() is None
             return {"running": running, "done": self.done, "error": self.error}
 
+ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".fits", ".fit", ".fts"}
+SOLVE_TIMEOUT_S = 300
+
+def _parse_wcs(wcs_path: Path) -> dict | None:
+    #Read CRVAL1/CRVAL2 from a FITS .wcs file and return RA/Dec strings w/o astropy, keep the venv minimal
+    try:
+        raw = wcs_path.read_bytes()
+        header = {}
+        for i in range(0, len(raw), 80):
+            card = raw[i:i + 80]
+            if card[:3] == b"END":
+                break
+            text = card.decode("ascii", errors="replace")
+            if "=" not in text[:9]:
+                continue
+            key = text[:8].strip()
+            val = text[9:].split("/")[0].strip().strip("'\" ")
+            header[key] = val
+ 
+        ra_deg  = float(header["CRVAL1"])
+        dec_deg = float(header["CRVAL2"])
+ 
+        # RA degrees → h m s
+        ra = ra_deg % 360
+        rh = int(ra / 15)
+        rm = int((ra / 15 - rh) * 60)
+        rs = ((ra / 15 - rh) * 60 - rm) * 60
+        ra_str = f"{rh:02d}h {rm:02d}m {rs:05.2f}s"
+ 
+        # Dec degrees → ± d m s
+        sign = "+" if dec_deg >= 0 else "-"
+        d = abs(dec_deg)
+        dd = int(d)
+        dm = int((d - dd) * 60)
+        ds = ((d - dd) * 60 - dm) * 60
+        dec_str = f"{sign}{dd:02d}° {dm:02d}' {ds:05.2f}\""
+ 
+        # pixel scale from CDELT1 if present (degrees/pixel → arcsec/pixel)
+        pix_scale = None
+        if "CDELT1" in header:
+            pix_scale = round(abs(float(header["CDELT1"])) * 3600, 4)
+ 
+        return {
+            "ra_deg": round(ra_deg, 6),
+            "dec_deg": round(dec_deg, 6),
+            "ra_str": ra_str,
+            "dec_str": dec_str,
+            "pix_scale_arcsec": pix_scale,
+        }
+    except Exception:
+        return None
+
+def _append_history(record: dict) -> None: #write history
+    try:
+        with open(SOLVE_HISTORY_FILE, "a") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception:
+        pass
+ 
+
+def _load_history(limit: int = 50) -> list[dict]: #read history
+    records = []
+    try:
+        with open(SOLVE_HISTORY_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        records.append(json.loads(line))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return list(reversed(records))[:limit]   # newest first
+ 
+class PlateSolveJob:
+    """One solve-field run. Created per upload; run by PlateSolveManager's worker thread."""
+    def __init__(self, job_id: str, image_path: Path, original_name: str,
+                 ra_hint: float | None = None, dec_hint: float | None = None,
+                 radius_hint: float | None = None,
+                 scale_low: float | None = None, scale_high: float | None = None):
+        self.job_id = job_id
+        self.image_path = image_path
+        self.original_name = original_name
+        self.ra_hint = ra_hint
+        self.dec_hint = dec_hint
+        self.radius_hint = radius_hint
+        self.scale_low = scale_low
+        self.scale_high = scale_high
+ 
+        self.status = "queued"          # queued, running, solved, failed
+        self.result: dict | None = None
+        self.error: str | None = None
+        self.log_lines: list[str] = []
+        self.started_at: float | None = None
+        self.finished_at: float | None = None
+ 
+        self._lock = threading.Lock()   # instance-level, not class-level
+        self._proc: subprocess.Popen | None = None
+ 
+    # called by PlateSolveManager._worker, runs synchronously in that thread
+    def run(self) -> None:
+        self.started_at = time.time()
+        self.status = "running"
+
+        try:
+            # fail fast before Popen so the error is clean. Everything from
+            # here down is inside the try so that a failure in setup (missing
+            # binary, un-creatable work dir) marks the job failed rather than
+            # escaping run() and killing the manager's worker thread.
+            solve_bin = shutil.which("solve-field")
+            if solve_bin is None:
+                self._fail(
+                    "solve-field not found on PATH. "
+                    "Run: sudo apt install astrometry.net astrometry-data-tycho2"
+                )
+                return
+
+            work = SOLVE_WORK_DIR / self.job_id
+            work.mkdir(parents=True, exist_ok=True)
+
+            cmd = [
+                solve_bin,
+                "--no-plots",
+                "--overwrite",
+                "--dir", str(work),
+                "--new-fits", "none",
+                "--no-remove-lines",
+                "--no-verify",
+            ]
+            if self.ra_hint is not None and self.dec_hint is not None:
+                cmd += ["--ra", str(self.ra_hint),
+                        "--dec", str(self.dec_hint),
+                        "--radius", str(self.radius_hint or 5.0)]
+            if self.scale_low is not None:
+                cmd += ["--scale-low", str(self.scale_low)]
+            if self.scale_high is not None:
+                cmd += ["--scale-high", str(self.scale_high)]
+            cmd.append(str(self.image_path))
+
+            self.log_lines.append(f"$ {' '.join(cmd)}")
+
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            with self._lock:
+                self._proc = proc
+ 
+            # drain stdout in a side thread so we can enforce a hard timeout
+            def _reader():
+                for line in iter(proc.stdout.readline, ""):
+                    s = line.rstrip()
+                    if s:
+                        self.log_lines.append(s)
+ 
+            rt = threading.Thread(target=_reader, daemon=True)
+            rt.start()
+ 
+            try:
+                proc.wait(timeout=SOLVE_TIMEOUT_S)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                self._fail(
+                    f"solve-field timed out after {SOLVE_TIMEOUT_S}s. "
+                    "Check that index files are installed: "
+                    "sudo apt install astrometry-data-tycho2"
+                )
+                return
+ 
+            rt.join(timeout=5)
+ 
+            if proc.returncode != 0:
+                log_text = "\n".join(self.log_lines).lower()
+                if "no index files" in log_text:
+                    msg = "No index files found — run: sudo apt install astrometry-data-tycho2"
+                elif "field did not solve" in log_text or "didn't solve" in log_text:
+                    msg = "Field did not solve. Try a longer exposure, or add a RA/Dec/scale hint."
+                else:
+                    msg = f"solve-field exited {proc.returncode}. Check the solve log for details."
+                self._fail(msg)
+                return
+ 
+            # find the .wcs file, solve-field names it after the input stem
+            wcs_files = list(work.glob("*.wcs"))
+            if not wcs_files:
+                self._fail(
+                    "solve-field succeeded but produced no .wcs file — "
+                    "the field likely did not match any index stars."
+                )
+                return
+ 
+            parsed = _parse_wcs(wcs_files[0])
+            if parsed:
+                self.result = parsed
+                self.status = "solved"
+                self.log_lines.append(
+                    f"✓ RA={parsed['ra_str']}  Dec={parsed['dec_str']}"
+                )
+            else:
+                self._fail("WCS file found but RA/Dec could not be parsed.")
+ 
+        except Exception as exc:
+            self._fail(f"Unexpected error: {exc}")
+        finally:
+            self.finished_at = time.time()
+            _append_history(self._to_dict())
+ 
+    def cancel(self) -> bool:
+        with self._lock:
+            proc = self._proc
+        if proc is None or proc.poll() is not None:
+            return False
+        try:
+            proc.terminate()
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        except Exception:
+            pass
+        return True
+ 
+    def _fail(self, msg: str) -> None:
+        self.status = "failed"
+        self.error = msg
+        self.log_lines.append(f"ERROR: {msg}")
+ 
+    def _to_dict(self) -> dict:
+        return {
+            "job_id": self.job_id,
+            "original_name": self.original_name,
+            "status": self.status,
+            "result": self.result,
+            "error": self.error,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "elapsed_s": (
+                round(self.finished_at - self.started_at, 1)
+                if self.started_at and self.finished_at else None
+            ),
+        }
+ 
+    def to_api_dict(self, include_log: bool = False) -> dict:
+        d = self._to_dict()
+        if not d["elapsed_s"] and self.started_at:
+            d["elapsed_s"] = round(time.time() - self.started_at, 1)
+        if include_log:
+            d["log"] = self.log_lines[-200:]
+        return d
+    
+class PlateSolveManager:
+    #Serialises solve jobs through a single background worker thread
+    #jobs are queued and run one at a time (solve-field is CPU-heavy)
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._jobs: dict[str, PlateSolveJob] = {}
+        self._queue: list[PlateSolveJob] = []
+        self._event = threading.Event()
+        threading.Thread(target=self._worker, daemon=True).start()
+ 
+    def submit(self, job: PlateSolveJob) -> None:
+        with self._lock:
+            self._jobs[job.job_id] = job
+            self._queue.append(job)
+        self._event.set()
+ 
+    def get(self, job_id: str) -> PlateSolveJob | None:
+        with self._lock:
+            return self._jobs.get(job_id)
+ 
+    def list_jobs(self) -> list[dict]:
+        with self._lock:
+            jobs = list(self._jobs.values())
+        jobs.sort(key=lambda j: j.started_at or 0, reverse=True)
+        return [j.to_api_dict() for j in jobs]
+ 
+    def _worker(self) -> None:
+        while True:
+            self._event.wait()
+            # drain the whole queue before waiting again — avoids missing a
+            # submit() that arrived while the previous job was running
+            while True:
+                with self._lock:
+                    if not self._queue:
+                        self._event.clear()
+                        break
+                    job = self._queue.pop(0)
+                # A failing job must never kill this thread — otherwise every
+                # job submitted afterwards sits at "queued" forever (the
+                # "infinite submitting" bug). run() is defensive on its own,
+                # but keep a backstop here so any escaping exception is turned
+                # into a failed job instead of a dead worker.
+                try:
+                    job.run()   # blocking; job updates its own status fields
+                except Exception as exc:
+                    job._fail(f"Unexpected worker error: {exc}")
+                    job.finished_at = time.time()
+                    try:
+                        _append_history(job._to_dict())
+                    except Exception:
+                        pass
+
 logger_mgr = LoggerManager()
 plotter_mgr = PlotterManager()
+solve_mgr   = PlateSolveManager()
 
+#logger routes
 @app.route("/logger/start", methods=["POST"])
 def logger_start():
     started = logger_mgr.start()
@@ -237,6 +558,7 @@ def logger_stream():
         },
     )
 
+#plotter routes
 @app.route("/plotter/run", methods=["POST"])
 def plotter_run():
     data = request.get_json(silent=True) or {}
@@ -254,6 +576,7 @@ def plotter_run():
 def plotter_status():
     return jsonify(plotter_mgr.status())
 
+#plot/log file routes
 @app.route("/plots")
 def list_plots():
     result: dict[str, list] = {}
@@ -294,6 +617,89 @@ def list_logs():
                 })
     items.sort(key=lambda x: x["mtime"], reverse=True)
     return jsonify(items)
+
+#plate solver routes
+@app.route("/solve/check")
+def solve_check():
+    binary = shutil.which("solve-field")
+    return jsonify({
+        "available": binary is not None,
+        "binary": binary,
+        "message": None if binary else
+                   "solve-field not found. Install: sudo apt install astrometry.net astrometry-data-tycho2",
+    })
+ 
+@app.route("/solve/submit", methods=["POST"])
+def solve_submit():
+    if "image" not in request.files:
+        return jsonify({"error": "No file uploaded (field name must be 'image')"}), 400
+    f = request.files["image"]
+    if not f.filename:
+        return jsonify({"error": "Empty filename"}), 400
+    suffix = Path(f.filename).suffix.lower()
+    if suffix not in ALLOWED_IMAGE_EXTENSIONS:
+        return jsonify({"error": f"Unsupported file type '{suffix}'. "
+                                  f"Allowed: {', '.join(sorted(ALLOWED_IMAGE_EXTENSIONS))}"}), 400
+ 
+    job_id = uuid.uuid4().hex[:12]
+    dest   = SOLVE_IMAGES_DIR / f"{job_id}{suffix}"
+    f.save(str(dest))
+ 
+    def _float(key):
+        v = request.form.get(key)
+        try:
+            return float(v) if v is not None else None
+        except (ValueError, TypeError):
+            return None
+ 
+    job = PlateSolveJob(
+        job_id=job_id,
+        image_path=dest,
+        original_name=f.filename,
+        ra_hint=_float("ra_hint"),
+        dec_hint=_float("dec_hint"),
+        radius_hint=_float("radius_hint"),
+        scale_low=_float("scale_low"),
+        scale_high=_float("scale_high"),
+    )
+    solve_mgr.submit(job)
+    return jsonify({"job_id": job_id, "status": "queued"})
+ 
+ 
+@app.route("/solve/job/<job_id>")
+def solve_job(job_id):
+    job = solve_mgr.get(job_id)
+    if not job:
+        abort(404)
+    include_log = request.args.get("log", "false").lower() == "true"
+    return jsonify(job.to_api_dict(include_log=include_log))
+ 
+ 
+@app.route("/solve/job/<job_id>/cancel", methods=["POST"])
+def solve_cancel(job_id):
+    job = solve_mgr.get(job_id)
+    if not job:
+        abort(404)
+    return jsonify({"cancelled": job.cancel()})
+ 
+ 
+@app.route("/solve/jobs")
+def solve_jobs():
+    return jsonify(solve_mgr.list_jobs())
+ 
+ 
+@app.route("/solve/history")
+def solve_history():
+    limit = min(int(request.args.get("limit", 50)), 200)
+    return jsonify(_load_history(limit))
+ 
+ 
+@app.route("/solve/image/<job_id>")
+def solve_image(job_id):
+    job = solve_mgr.get(job_id)
+    if not job:
+        abort(404)
+    return send_from_directory(str(SOLVE_IMAGES_DIR), job.image_path.name)
 
 @app.route("/")
 def index():

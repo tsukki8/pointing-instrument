@@ -4,10 +4,12 @@ import LoggerPanel from './components/LoggerPanel.jsx';
 import PlotterPanel from './components/PlotterPanel.jsx';
 import PlotViewer from './components/PlotViewer.jsx';
 import LogFileTable from './components/LogFileTable.jsx';
+import PlateSolverPanel from './components/PlateSolverPanel.jsx';
 import { api } from './api.js';
 import './App.css';
 
 export default function App() {
+  const [tab, setTab] = useState('imu_logger');
   const [loggerRunning, setLoggerRunning] = useState(false);
   const [plotterStatus, setPlotterStatus] = useState({ running: false, done: false, error: null });
   const [logsVersion, setLogsVersion] = useState(0);
@@ -50,19 +52,39 @@ export default function App() {
   return (
     <div className="app">
       <Header loggerRunning={loggerRunning} />
-      <div className="panels">
-        <LoggerPanel
-          loggerRunning={loggerRunning}
-          onLocalChange={setLoggerRunning}
-        />
-        <PlotterPanel
-          loggerRunning={loggerRunning}
-          plotterStatus={plotterStatus}
-          logsVersion={logsVersion}
-        />
+      <div className="app-tabs">
+        <button
+          className={`app-tab ${tab === 'imu_logger' ? 'active' : ''}`}
+          onClick={() => setTab('imu_logger')}
+        >
+          IMU / GPS Logger
+        </button>
+        <button
+          className={`app-tab ${tab === 'plate_solver' ? 'active' : ''}`}
+          onClick={() => setTab('plate_solver')}
+        >
+          Plate Solver
+        </button>
       </div>
-      <PlotViewer plotsVersion={plotsVersion} />
-      <LogFileTable logsVersion={logsVersion} />
+      {tab === 'imu_logger' ? (
+        <>
+          <div className="panels">
+            <LoggerPanel
+              loggerRunning={loggerRunning}
+              onLocalChange={setLoggerRunning}
+            />
+            <PlotterPanel
+              loggerRunning={loggerRunning}
+              plotterStatus={plotterStatus}
+              logsVersion={logsVersion}
+            />
+          </div>
+          <PlotViewer plotsVersion={plotsVersion} />
+          <LogFileTable logsVersion={logsVersion} />
+        </>
+      ) : (
+        <PlateSolverPanel />
+      )}
     </div>
   );
 }
