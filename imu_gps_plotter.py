@@ -23,21 +23,23 @@ for f in folders.values():
 # === load and clean data ===
 df = pd.read_json(file_path, lines=True)
 df["gps_time"] = pd.to_datetime(df["gps_time"], errors="coerce")
-df = df.dropna(subset=["gps_time"]).reset_index(drop=True)
+df = df.dropna(subset=["gps_time", "mag", "accel", "gyro"]).reset_index(drop=True)
+if len(df) == 0:
+    raise ValueError("No valid data found after cleaning. Please check the input file.")
 time = df["gps_time"]
 
 # === data extraction ===
 roll, pitch, yaw = df["roll"], df["pitch"], df["yaw"]
 
-mag = np.vstack(df["mag"])
+mag = np.vstack(df["mag"].to_numpy())
 mx, my, mz = mag[:,0], mag[:,1], mag[:,2]
 mag_mag = np.linalg.norm(mag, axis=1)
 
-acc = np.vstack(df["accel"])
+acc = np.vstack(df["accel"].to_numpy())
 gx, gy, gz = acc[:,3], acc[:,4], acc[:,5]
 g_mag = np.linalg.norm(acc[:,3:6], axis=1)
 
-gyro = np.vstack(df["gyro"]).reshape(-1, 3, 3)  # reshape to (N, 3, 3)
+gyro = np.vstack(df["gyro"].to_numpy()).reshape(-1, 3, 3)  # reshape to (N, 3, 3)
 dt_vals = df["gps_time"].diff().dt.total_seconds().fillna(0).values  # time differences in seconds
 
 omega_x, omega_y, omega_z = [], [], []
