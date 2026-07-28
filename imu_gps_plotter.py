@@ -88,12 +88,8 @@ def save(fig, folder, name):
     plt.close(fig)
     print(f"Saved {name} plot to: {path}")
 
-def gaussian_overlay(ax, data, color='black'):
-    data = np.asarray(data)
-    mu, std = np.mean(data), np.std(data)
-
+def gaussian_overlay(ax, data, mu, std, lo, hi, color='black', n_std=3):
     ax.axvline(mu, color=color, linestyle='dashed', linewidth=1, label='Mean')
-
     counts, bins = np.histogram(data, bins=50, density=True)
     bindwidth = bins[1] - bins[0]
     x = np.linspace(bins[0], bins[-1], 100)
@@ -191,32 +187,56 @@ save(fig, folders["dashboard"], "linear_plots")
 
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
-    ax.hist(data, bins=50, alpha=0.6, label=label)
-    gaussian_overlay(ax, data, color='black')
+    data = np.asarray(data)
+    mu, std = np.mean(data), np.std(data)
+    n_std = 3
+    lo, hi = mu - n_std * std, mu + n_std * std
+
+    ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
+    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    ax.set_xlim(lo, hi)
     format_hist(ax, "Radians", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_orientation")
 
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
-    ax.hist(data, bins=50, alpha=0.6, label=label)
-    gaussian_overlay(ax, data, color='black')
+    data = np.asarray(data)
+    mu, std = np.mean(data), np.std(data)
+    n_std = 3
+    lo, hi = mu - n_std * std, mu + n_std * std
+
+    ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
+    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    ax.set_xlim(lo, hi)
     format_hist(ax, "rad/s", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_angular_velocity")
 
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [gx, gy, gz], ["gx", "gy", "gz"]):
-    ax.hist(data, bins=50, alpha=0.6, label=label)
-    gaussian_overlay(ax, data, color='black')
+    data = np.asarray(data)
+    mu, std = np.mean(data), np.std(data)
+    n_std = 3
+    lo, hi = mu - n_std * std, mu + n_std * std
+
+    ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
+    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    ax.set_xlim(lo, hi)
     format_hist(ax, "g", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_accelerometer")
 
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [mx, my, mz], ["mx", "my", "mz"]):
-    ax.hist(data, bins=50, alpha=0.6, label=label)
-    gaussian_overlay(ax, data, color='black')
+    data = np.asarray(data)
+    mu, std = np.mean(data), np.std(data)
+    n_std = 3
+    lo, hi = mu - n_std * std, mu + n_std * std
+
+    ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
+    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    ax.set_xlim(lo, hi)
     format_hist(ax, r"($|\hat{B}|$)", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_magnetometer")
