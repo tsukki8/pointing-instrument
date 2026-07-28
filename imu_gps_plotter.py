@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from scipy.stats import norm
 
 # === updated file paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_210751.jsonl")
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_205943.jsonl")
 base_output = os.path.join(BASE_DIR, "imu_graphs")
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -28,6 +29,7 @@ if len(df) == 0:
     raise ValueError("No valid data found after cleaning. Please check the input file.")
 time = df["gps_time"]
 
+plt.rcParams.update({'font.size': 14})
 # === data extraction ===
 roll, pitch, yaw = df["roll"], df["pitch"], df["yaw"]
 
@@ -62,7 +64,7 @@ lon, lat = df["gps_lon"], df["gps_lat"]
 
 # helper func applying same axis formatting to all subplots
 def format(ax, ylabel, title, legend=False):
-    ax.set_title(title)
+    #ax.set_title(title)
     ax.set_xlabel("UTC")
     ax.set_ylabel(ylabel)
     ax.tick_params(axis='x', labelrotation=30)
@@ -72,7 +74,7 @@ def format(ax, ylabel, title, legend=False):
 
 # helper func applying axes formatting for histograms
 def format_hist(ax, xlabel, title, legend=False):
-    ax.set_title(title)
+    #ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Count")
     ax.grid()
@@ -85,6 +87,18 @@ def save(fig, folder, name):
     fig.savefig(path, dpi=300)
     plt.close(fig)
     print(f"Saved {name} plot to: {path}")
+
+def gaussian_overlay(ax, data, color='black'):
+    data = np.asarray(data)
+    mu, std = np.mean(data), np.std(data)
+
+    ax.axvline(mu, color=color, linestyle='dashed', linewidth=1, label='Mean')
+
+    counts, bins = np.histogram(data, bins=50, density=True)
+    bindwidth = bins[1] - bins[0]
+    x = np.linspace(bins[0], bins[-1], 100)
+    pdf = norm.pdf(x, mu, std)*bindwidth*len(data)
+    ax.plot(x, pdf, color=color, linewidth=2, label=f'Gaussian Fit (μ={mu:.4f}, σ={std:.4f})')
 
 # === orientation ===
 fig, ax = plt.subplots(figsize=(10, 4))
@@ -175,95 +189,10 @@ format(axs[2, 1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\h
 
 save(fig, folders["dashboard"], "linear_plots")
 
-'''
-# === histograms to evaluate noise trends: skew, outliers, acceptable ranges ===
-fig, axs = plt.subplots(2, 2, figsize=(15, 12))
-
-for data, label in zip([roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
-    axs[0,0].hist(data, bins=50, alpha=0.6, label=label)
-format_hist(axs[0, 0], "Radians", "Euler Angles Distribution (roll, pitch, yaw)", legend=True)
-
-for data, label in zip([omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
-    axs[0,1].hist(data, bins=50, alpha=0.6, label=label)
-format_hist(axs[0, 1], "rad/s", "Angular Velocity Distribution (ωx, ωy, ωz)", legend=True)
-
-for data, label in zip([gx, gy, gz], ["gx", "gy", "gz"]):
-    axs[1,0].hist(data, bins=50, alpha=0.6, label=label)
-format_hist(axs[1, 0], "g", "Gravity Components Distribution (gx, gy, gz)", legend=True)
-
-for data, label in zip([mx, my, mz], ["mx", "my", "mz"]):
-    axs[1,1].hist(data, bins=50, alpha=0.6, label=label)
-format_hist(axs[1, 1], r"($|\hat{B}|$)", "Magnetic Field Components Distribution", legend=True)
-
-save(fig, folders["dashboard"], "histograms")
-
-# histograms of only roll
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(roll, bins=50, alpha=0.6, label="Roll")
-format_hist(ax, "Radians", "Roll Distribution", legend=True)
-save(fig, folders["orientation"], "roll_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(pitch, bins=50, alpha=0.6, label="Pitch")
-format_hist(ax, "Radians", "Pitch Distribution", legend=True)
-save(fig, folders["orientation"], "pitch_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(yaw, bins=50, alpha=0.6, label="Yaw")
-format_hist(ax, "Radians", "Yaw Distribution", legend=True)
-save(fig, folders["orientation"], "yaw_histogram")
-
-# histograms of only ωx
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(omega_x, bins=50, alpha=0.6, label="ωx")
-format_hist(ax, "rad/s", "ωx Distribution", legend=True)
-save(fig, folders["angular_velocity"], "omega_x_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(omega_y, bins=50, alpha=0.6, label="ωy")
-format_hist(ax, "rad/s", "ωy Distribution", legend=True)
-save(fig, folders["angular_velocity"], "omega_y_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(omega_z, bins=50, alpha=0.6, label="ωz")
-format_hist(ax, "rad/s", "ωz Distribution", legend=True)
-save(fig, folders["angular_velocity"], "omega_z_histogram")
-
-# histograms of only gx
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(gx, bins=50, alpha=0.6, label="gx")
-format_hist(ax, "g", "gx Distribution", legend=True)
-save(fig, folders["accelerometer"], "gx_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(gy, bins=50, alpha=0.6, label="gy")
-format_hist(ax, "g", "gy Distribution", legend=True)
-save(fig, folders["accelerometer"], "gy_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(gz, bins=50, alpha=0.6, label="gz")
-format_hist(ax, "g", "gz Distribution", legend=True)
-save(fig, folders["accelerometer"], "gz_histogram")
-
-# histograms of only mx
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(mx, bins=50, alpha=0.6, label="mx")
-format_hist(ax, r"($|\hat{B}|$)", "mx Distribution", legend=True)
-save(fig, folders["magnetometer"], "mx_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(my, bins=50, alpha=0.6, label="my")
-format_hist(ax, r"($|\hat{B}|$)", "my Distribution", legend=True)
-save(fig, folders["magnetometer"], "my_histogram")
-
-fig, ax = plt.subplots(figsize=(10, 6))
-ax.hist(mz, bins=50, alpha=0.6, label="mz")
-format_hist(ax, r"($|\hat{B}|$)", "mz Distribution", legend=True)
-save(fig, folders["magnetometer"], "mz_histogram")
-'''
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
     ax.hist(data, bins=50, alpha=0.6, label=label)
+    gaussian_overlay(ax, data, color='black')
     format_hist(ax, "Radians", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_orientation")
@@ -271,6 +200,7 @@ save(fig, folders["dashboard"], "histograms_orientation")
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
     ax.hist(data, bins=50, alpha=0.6, label=label)
+    gaussian_overlay(ax, data, color='black')
     format_hist(ax, "rad/s", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_angular_velocity")
@@ -278,6 +208,7 @@ save(fig, folders["dashboard"], "histograms_angular_velocity")
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [gx, gy, gz], ["gx", "gy", "gz"]):
     ax.hist(data, bins=50, alpha=0.6, label=label)
+    gaussian_overlay(ax, data, color='black')
     format_hist(ax, "g", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_accelerometer")
@@ -285,6 +216,7 @@ save(fig, folders["dashboard"], "histograms_accelerometer")
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [mx, my, mz], ["mx", "my", "mz"]):
     ax.hist(data, bins=50, alpha=0.6, label=label)
+    gaussian_overlay(ax, data, color='black')
     format_hist(ax, r"($|\hat{B}|$)", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_magnetometer")
