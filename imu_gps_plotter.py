@@ -160,7 +160,7 @@ format(axs[0, 0], "Radians", "Euler Angles (rad) vs Time", legend=True)
 axs[0,1].plot(time, omega_x, label="ωx")
 axs[0,1].plot(time, omega_y, label="ωy")
 axs[0,1].plot(time, omega_z, label="ωz")
-axs[0,1].set_ylim(-1, 1)
+axs[0,1].set_ylim(-0.1, 0.1)
 format(axs[0, 1], "rad/s", "Angular Velocity (rad/s) vs Time", legend=True)
 
 # Gravity components
@@ -170,17 +170,17 @@ axs[1,0].plot(time, gz, label="gz")
 format(axs[1, 0], "g", "Gravity Components (normalized) vs Time", legend=True)
 # Gravity magnitude
 axs[1,1].plot(time, g_mag)
-axs[1,1].set_ylim(0.999999, 1.000001)
-format(axs[1, 1], "g", "Gravity Magnitude (normalized) vs Time", legend=False)
+axs[1,1].set_ylim(-0.5, 0.5)
+format(axs[1, 1], r"$\vert g \vert$", "Gravity Magnitude (normalized) vs Time", legend=False)
 
 # Magnetometer components
 axs[2,0].plot(time, mx, label="mx")
 axs[2,0].plot(time, my, label="my")
 axs[2,0].plot(time, mz, label="mz")
-format(axs[2, 0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($|\hat{B}|$) vs Time", legend=True)
+format(axs[2, 0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($\hat{B}|$) vs Time", legend=True)
 # Magnetometer magnitude
 axs[2,1].plot(time, mag_mag)
-axs[2,1].set_ylim(0.999999, 1.000001)
+axs[2,1].set_ylim(-0.5, 0.5)
 format(axs[2, 1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
 
 save(fig, folders["dashboard"], "linear_plots")
