@@ -6,7 +6,7 @@ from scipy.stats import norm
 
 # === updated file paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_205943.jsonl")
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_210751.jsonl")
 base_output = os.path.join(BASE_DIR, "imu_graphs")
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -89,12 +89,12 @@ def save(fig, folder, name):
     print(f"Saved {name} plot to: {path}")
 
 def gaussian_overlay(ax, data, mu, std, lo, hi, color='black', n_std=3):
-    ax.axvline(mu, color=color, linestyle='dashed', linewidth=1, label='Mean')
+    ax.axvline(mu, color=color, linestyle='dashed', linewidth=1)
     counts, bins = np.histogram(data, bins=50, density=True)
     bindwidth = bins[1] - bins[0]
     x = np.linspace(bins[0], bins[-1], 100)
     pdf = norm.pdf(x, mu, std)*bindwidth*len(data)
-    ax.plot(x, pdf, color=color, linewidth=2, label=f'Gaussian Fit (μ={mu:.4f}, σ={std:.4f})')
+    ax.plot(x, pdf, color=color, linewidth=2, label=f'Gaussian Fit (μ={mu:.3f}, σ={std:.3f})')
 
 # === orientation ===
 fig, ax = plt.subplots(figsize=(10, 4))
