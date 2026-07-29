@@ -36,11 +36,13 @@ roll, pitch, yaw = df["roll"], df["pitch"], df["yaw"]
 
 mag = np.vstack(df["mag"].to_numpy())
 mx, my, mz = mag[:,0], mag[:,1], mag[:,2]
-mag_mag = np.linalg.norm(mag, axis=1)
+mag_mag = (mx**2 + my**2 + mz**2)**0.5
+#mag_mag = np.linalg.norm(mag, axis=1)
 
 acc = np.vstack(df["accel"].to_numpy())
 gx, gy, gz = acc[:,3], acc[:,4], acc[:,5]
-g_mag = np.linalg.norm(acc[:,3:6], axis=1)
+g_mag = (gx**2 + gy**2 + gz**2)**0.5
+#g_mag = np.linalg.norm(acc[:,3:6], axis=1)
 
 gyro = np.vstack(df["gyro"].to_numpy()).reshape(-1, 3, 3)  # reshape to (N, 3, 3)
 dt_vals = df["gps_time"].diff().dt.total_seconds().fillna(0).values  # time differences in seconds
