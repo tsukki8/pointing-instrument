@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from scipy.stats import norm
+from matplotlib.ticker import ScalarFormatter
 
 # === updated file paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_210751.jsonl")
+file_path = os.path.join(BASE_DIR, "imu_logs", "imu_gps_20260701_204741.jsonl")
 base_output = os.path.join(BASE_DIR, "imu_graphs")
 file_name = os.path.splitext(os.path.basename(file_path))[0]
 
@@ -46,7 +47,7 @@ dt_vals = df["gps_time"].diff().dt.total_seconds().fillna(0).values  # time diff
 
 omega_x, omega_y, omega_z = [], [], []
 for i in range(1, len(gyro)):
-    dt = dt_vals[i]
+    dt = dt_vals[i]/np.pi*180  # convert to degrees
     if dt <= 0:
         omega_x.append(0); omega_y.append(0); omega_z.append(0)
         continue
@@ -64,7 +65,7 @@ lon, lat = df["gps_lon"], df["gps_lat"]
 
 # helper func applying same axis formatting to all subplots
 def format(ax, ylabel, title, legend=False):
-    #ax.set_title(title)
+    ax.set_title(title)
     ax.set_xlabel("UTC")
     ax.set_ylabel(ylabel)
     ax.tick_params(axis='x', labelrotation=30)
@@ -88,20 +89,20 @@ def save(fig, folder, name):
     plt.close(fig)
     print(f"Saved {name} plot to: {path}")
 
-def gaussian_overlay(ax, data, mu, std, lo, hi, color='black', n_std=3):
+def gaussian_overlay_fixed(ax, data, mu, std, lo, hi, color='black', n_std=4):
     ax.axvline(mu, color=color, linestyle='dashed', linewidth=1)
-    counts, bins = np.histogram(data, bins=50, density=True)
+    counts, bins = np.histogram(data, bins=50, range=(lo, hi), density=True)
     bindwidth = bins[1] - bins[0]
-    x = np.linspace(bins[0], bins[-1], 100)
+    x = np.linspace(lo, hi, 200)
     pdf = norm.pdf(x, mu, std)*bindwidth*len(data)
-    ax.plot(x, pdf, color=color, linewidth=2, label=f'Gaussian Fit (μ={mu:.3f}, σ={std:.3f})')
+    ax.plot(x, pdf, color=color, linewidth=2) #label=f'Gaussian Fit (μ={mu:.3f}, σ={std:.3f})'
 
 # === orientation ===
 fig, ax = plt.subplots(figsize=(10, 4))
-ax.plot(time, roll, label="Roll")
-ax.plot(time, pitch, label="Pitch")
-ax.plot(time, yaw, label="Yaw")
-format(ax, "Radians", "Euler Angles (rad) vs Time", legend=True)
+ax.plot(time, roll/np.pi*180, label="Roll")
+ax.plot(time, pitch/np.pi*180, label="Pitch")
+ax.plot(time, yaw/np.pi*180, label="Yaw")
+format(ax, "Degrees", "Euler Angles (deg) vs Time", legend=True)
 plt.tight_layout()
 save(fig, folders["orientation"], "orientation")
 
@@ -111,7 +112,7 @@ ax.plot(time, omega_x, label="ωx")
 ax.plot(time, omega_y, label="ωy")
 ax.plot(time, omega_z, label="ωz")
 ax.set_ylim(-1, 1)
-format(ax, "rad/s", "Angular Velocity (rad/s) vs Time", legend=True)
+format(ax, "deg/s", "Angular Velocity (deg/s) vs Time", legend=True)
 plt.tight_layout()
 save(fig, folders["angular_velocity"], "angular_velocity")
 
@@ -151,51 +152,64 @@ save(fig, folders["gps"], "gps")
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), sharex=True)
 
 # Euler angles
-axs[0,0].plot(time, roll, label="Roll")
-axs[0,0].plot(time, pitch, label="Pitch")
-axs[0,0].plot(time, yaw, label="Yaw")
-format(axs[0, 0], "Radians", "Euler Angles (rad) vs Time", legend=True)
+axs[0,0].plot(time, roll/np.pi*180, label="Roll")
+axs[0,0].plot(time, pitch/np.pi*180, label="Pitch")
+axs[0,0].plot(time, yaw/np.pi*180, label="Yaw")
+format(axs[0, 0], "Degrees", "Euler Angles (deg) vs Time", legend=True)
 
 # Angular velocity
 axs[0,1].plot(time, omega_x, label="ωx")
 axs[0,1].plot(time, omega_y, label="ωy")
 axs[0,1].plot(time, omega_z, label="ωz")
-axs[0,1].set_ylim(-1, 1)
-format(axs[0, 1], "rad/s", "Angular Velocity (rad/s) vs Time", legend=True)
+axs[0,1].set_ylim(-0.03, 0.03)
+format(axs[0, 1], "deg/s", "Angular Velocity (deg/s) vs Time", legend=True)
+
+'''
+def sci(ax):
+    fmt = ScalarFormatter(useOffset=False)
+    fmt.set_scientific(True)
+    fmt.set_powerlimits((0, 0))
+    ax.yaxis.set_major_formatter(fmt)
+    #ax.ticklabel_format(useOffset=False, style='sci', axis='y', useMathText=True)
+'''
 
 # Gravity components
 axs[1,0].plot(time, gx, label="gx")
 axs[1,0].plot(time, gy, label="gy")
 axs[1,0].plot(time, gz, label="gz")
 format(axs[1, 0], "g", "Gravity Components (normalized) vs Time", legend=True)
-# Gravity magnitude
+# Gravity magnitude 
 axs[1,1].plot(time, g_mag)
-axs[1,1].set_ylim(0.999999, 1.000001)
-format(axs[1, 1], "g", "Gravity Magnitude (normalized) vs Time", legend=False)
+#axs[1,1].ticklabel_format(useOffset=False, style='plain', axis='y', useMathText=True)
+#sci(axs[1, 1])
+axs[1,1].set_ylim(0.9999995, 1.0000003)
+format(axs[1, 1], r"$\vert g \vert$", "Gravity Magnitude (normalized) vs Time", legend=False)
 
 # Magnetometer components
 axs[2,0].plot(time, mx, label="mx")
 axs[2,0].plot(time, my, label="my")
 axs[2,0].plot(time, mz, label="mz")
-format(axs[2, 0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($|\hat{B}|$) vs Time", legend=True)
+format(axs[2, 0], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Components ($\hat{B}|$) vs Time", legend=True)
 # Magnetometer magnitude
 axs[2,1].plot(time, mag_mag)
-axs[2,1].set_ylim(0.999999, 1.000001)
-format(axs[2, 1], r"$\hat{B} = \frac{B}{|B|}$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
-
+#axs[2,1].ticklabel_format(useOffset=False, style='plain', axis='y', useMathText=True)
+#sci(axs[2, 1])
+axs[2,1].set_ylim(0.99999985, 1.00000017)
+format(axs[2, 1], r"$\vert \hat{B} \vert$", r"Magnetic Field Magnitude ($|\hat{B}|$) vs Time", legend=False)
 save(fig, folders["dashboard"], "linear_plots")
 
 fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [roll, pitch, yaw], ["Roll", "Pitch", "Yaw"]):
+    roll, pitch, yaw = roll/np.pi*180, pitch/np.pi*180, yaw/np.pi*180
     data = np.asarray(data)
     mu, std = np.mean(data), np.std(data)
-    n_std = 3
+    n_std = 4
     lo, hi = mu - n_std * std, mu + n_std * std
 
     ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
-    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    gaussian_overlay_fixed(ax, data, mu, std, lo, hi, color='black')
     ax.set_xlim(lo, hi)
-    format_hist(ax, "Radians", f"{label} Distribution", legend=True)
+    format_hist(ax, "Degrees", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_orientation")
 
@@ -203,13 +217,13 @@ fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [omega_x, omega_y, omega_z], ["ωx", "ωy", "ωz"]):
     data = np.asarray(data)
     mu, std = np.mean(data), np.std(data)
-    n_std = 3
+    n_std = 4
     lo, hi = mu - n_std * std, mu + n_std * std
 
     ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
-    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    gaussian_overlay_fixed(ax, data, mu, std, lo, hi, color='black')
     ax.set_xlim(lo, hi)
-    format_hist(ax, "rad/s", f"{label} Distribution", legend=True)
+    format_hist(ax, "deg/s", f"{label} Distribution", legend=True)
 plt.tight_layout()
 save(fig, folders["dashboard"], "histograms_angular_velocity")
 
@@ -217,11 +231,11 @@ fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [gx, gy, gz], ["gx", "gy", "gz"]):
     data = np.asarray(data)
     mu, std = np.mean(data), np.std(data)
-    n_std = 3
+    n_std = 4
     lo, hi = mu - n_std * std, mu + n_std * std
 
     ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
-    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    gaussian_overlay_fixed(ax, data, mu, std, lo, hi, color='black')
     ax.set_xlim(lo, hi)
     format_hist(ax, "g", f"{label} Distribution", legend=True)
 plt.tight_layout()
@@ -231,11 +245,11 @@ fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 for ax, data, label in zip(axs, [mx, my, mz], ["mx", "my", "mz"]):
     data = np.asarray(data)
     mu, std = np.mean(data), np.std(data)
-    n_std = 3
+    n_std = 4
     lo, hi = mu - n_std * std, mu + n_std * std
 
     ax.hist(data, bins=50, range=(lo, hi), alpha=0.6, label=label)
-    gaussian_overlay(ax, data, mu, std, lo, hi, color='black')
+    gaussian_overlay_fixed(ax, data, mu, std, lo, hi, color='black')
     ax.set_xlim(lo, hi)
     format_hist(ax, r"($|\hat{B}|$)", f"{label} Distribution", legend=True)
 plt.tight_layout()
