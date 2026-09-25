@@ -1,217 +1,410 @@
 /*******************************************************************
- * Code adapted into C++ from zwo-asi-c-example,
- * originally written by Github user vrruiz
- * 
- * Date accessed: 27 November 2024
- * Commit hash: 5eb5cd5
- * Committed 30 December 2019
- * 
- * Availability: https://github.com/vrruiz/zwo-asi-c-example
- ******************************************************************/
+ * ZWO ASI Camera Capture Test
+ *
+ * Adapted from zwo-asi-c-example by Github user vrruiz
+ *
+ * This version:
+ *   - Detects the ZWO camera
+ *   - Prints camera properties
+ *   - Opens and initializes the camera
+ *   - Sets exposure time
+ *   - Takes an exposure
+ *   - Retrieves the COMPLETE image buffer
+ *   - Saves the raw image data as a binary .raw file
+ *
+ * The .raw file contains the actual camera pixel buffer and can
+ * later be converted/interpreted according to the selected
+ * ZWO image format.
+ *******************************************************************/
 
-# include <iostream>
-# include <fstream>
-# include <sstream>
-# include <iomanip>
-# include <ctime>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
+#include <memory>
+#include <vector>
 
-# include <memory>
-# include <vector>
-
-# include "ASICamera2.h"
+#include "ASICamera2.h"
 
 using namespace std;
 
-string format_exposure_time(double time);
-
 int main(int argc, char *argv[]) {
+
     cout << "ZWO ASICamera test" << endl;
-    
+
     long image_size = 0;
     int bytes_per_pixel = 1;
 
-    // Read camera info, exit if no cameras are connected
+    //Read number of connected cameras
     int connected_cameras = ASIGetNumOfConnectedCameras();
-    cout << connected_cameras << endl;
+
+    cout << "Connected cameras: " << connected_cameras << endl;
+
     if (connected_cameras < 1) {
         cerr << "No cameras connected!" << endl;
-        return 0;
+        return 1;
     }
 
-    // Get connected camera's properties
+    // Get camera properties
     ASI_CAMERA_INFO camera_info;
+
     if (ASIGetCameraProperty(&camera_info, 0) != ASI_SUCCESS) {
         cerr << "Error retrieving camera properties!" << endl;
         return 1;
     }
 
-    // Display camera properties
-    cout << "Camera properties: " << endl;
+    cout << "\nCamera properties:" << endl;
     cout << "Name: " << camera_info.Name << endl;
     cout << "Camera ID: " << camera_info.CameraID << endl;
-    cout << "Width & Height: " << camera_info.MaxWidth << " x " << camera_info.MaxHeight << endl;
-    cout << "Color: " << (camera_info.IsColorCam == ASI_TRUE ? "Yes" : "No") << endl;
-    cout << "  Bayer pattern: " << camera_info.BayerPattern << endl;
-    cout << "  Pixel size: " << camera_info.PixelSize << " microns" << endl;
-    cout << "  e-/ADU: " << camera_info.ElecPerADU << endl;
-    cout << "  Bit depth: " << camera_info.BitDepth << endl;
-    cout << "  Trigger cam: " << (camera_info.IsTriggerCam ? "Yes" : "No") << endl;
+    cout << "Width & Height: "
+         << camera_info.MaxWidth << " x "
+         << camera_info.MaxHeight << endl;
 
-    // Calculate image size in bytes
-    int image_dimensions = camera_info.MaxWidth * camera_info.MaxHeight;
-    // Correct for monochromatic vs color image
-    if (camera_info.IsColorCam == ASI_FALSE)
-        bytes_per_pixel = (camera_info.BitDepth > 8) ? 2 : 1;
-    else
+    cout << "Color: "
+         << (camera_info.IsColorCam == ASI_TRUE ? "Yes" : "No")
+         << endl;
+
+    cout << "  Bayer pattern: "
+         << camera_info.BayerPattern << endl;
+
+    cout << "  Pixel size: "
+         << camera_info.PixelSize << " microns" << endl;
+
+    cout << "  e-/ADU: "
+         << camera_info.ElecPerADU << endl;
+
+    cout << "  Bit depth: "
+         << camera_info.BitDepth << endl;
+
+    cout << "  Trigger cam: "
+         << (camera_info.IsTriggerCam ? "Yes" : "No")
+         << endl;
+
+    // Calculate image buffer size
+    int image_dimensions =
+        camera_info.MaxWidth * camera_info.MaxHeight;
+
+    /*
+     * For this test we preserve the same calculation that your
+     * original program used.
+     *
+     * Color camera -> RGB24 = 3 bytes/pixel
+     * Mono > 8 bit -> 2 bytes/pixel
+     * Mono <= 8 bit -> 1 byte/pixel
+     */
+
+    if (camera_info.IsColorCam == ASI_FALSE) {
+        bytes_per_pixel =
+            (camera_info.BitDepth > 8) ? 2 : 1;
+    }
+    else {
         bytes_per_pixel = 3;
-    image_size = image_dimensions * bytes_per_pixel;
-    cout << "Image size: " << image_size << " bytes" << endl;
+    }
 
-    // Open and intialize camera
-    cout << "Opening camera" << endl;
+    image_size = image_dimensions * bytes_per_pixel;
+
+    cout << "Image dimensions: "
+         << image_dimensions << " pixels" << endl;
+
+    cout << "Bytes per pixel: "
+         << bytes_per_pixel << endl;
+
+    cout << "Image buffer size: "
+         << image_size << " bytes" << endl;
+
+    // Open camera
+    cout << "\nOpening camera" << endl;
+
     if (ASIOpenCamera(camera_info.CameraID) != ASI_SUCCESS) {
         cerr << "Error opening camera" << endl;
         return 1;
     }
-    cout << "Initalizing camera" << endl;
+
+    // Initialize camera
+    cout << "Initializing camera" << endl;
+
     if (ASIInitCamera(camera_info.CameraID) != ASI_SUCCESS) {
         cerr << "Error initializing camera" << endl;
+        ASICloseCamera(camera_info.CameraID);
+        return 1;
     }
 
     // Get camera controls
     int asi_num_controls = 0;
-    if (ASIGetNumOfControls(camera_info.CameraID, &asi_num_controls) != ASI_SUCCESS) {
-        cerr << "Error getting number of controls.\n";
+
+    if (ASIGetNumOfControls(
+            camera_info.CameraID,
+            &asi_num_controls) != ASI_SUCCESS) {
+
+        cerr << "Error getting number of controls." << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
         return 1;
     }
+
+    cout << "\nCamera controls:" << endl;
+
     for (int i = 0; i < asi_num_controls; ++i) {
+
         ASI_CONTROL_CAPS control_caps;
-        if (ASIGetControlCaps(camera_info.CameraID, i, &control_caps) == ASI_SUCCESS) {
-            cout << "  Property " << control_caps.Name << ": [" 
-                << control_caps.MinValue << ", " << control_caps.MaxValue 
-                << "] = " << control_caps.DefaultValue
-                << (control_caps.IsWritable ? " (set)" : "") 
-                << " - " << control_caps.Description << "\n";
+
+        if (ASIGetControlCaps(
+                camera_info.CameraID,
+                i,
+                &control_caps) == ASI_SUCCESS) {
+
+            cout << "  Property "
+                 << control_caps.Name
+                 << ": ["
+                 << control_caps.MinValue
+                 << ", "
+                 << control_caps.MaxValue
+                 << "] = "
+                 << control_caps.DefaultValue
+                 << (control_caps.IsWritable ? " (set)" : "")
+                 << " - "
+                 << control_caps.Description
+                 << endl;
         }
     }
 
-    // Exposure setup
-    cout << "Starting exposure" << endl;
+    // Check exposure status
+    cout << "\nStarting exposure" << endl;
+
     ASI_EXPOSURE_STATUS asi_exp_status;
-    ASIGetExpStatus(camera_info.CameraID, &asi_exp_status);
+
+    if (ASIGetExpStatus(
+            camera_info.CameraID,
+            &asi_exp_status) != ASI_SUCCESS) {
+
+        cerr << "Error getting exposure status" << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
+        return 1;
+    }
+
     if (asi_exp_status != ASI_EXP_IDLE) {
-        cerr << "Cannot start exposure if camera is not idle. Aborting..." << endl;
+
+        cerr << "Cannot start exposure because camera "
+             << "is not idle. Aborting..."
+             << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
         return 1;
     }
 
-    // Set exposure time
-    double exposure_seconds = 20; // Default value
+    // Exposure time
+    double exposure_seconds = 20.0;
+
     if (argc > 1) {
-        exposure_seconds = stod(argv[1]);
-    }
-    long exposure_time = exposure_seconds * 1000000; // Number of seconds * ms per second
-    cout << "Set exposure time: " << exposure_time / 1000000.0 << " seconds" << endl;
-    if (ASISetControlValue(camera_info.CameraID, ASI_EXPOSURE, exposure_time, ASI_FALSE) != ASI_SUCCESS) {
-        cerr << "Error setting exposure time" << endl;
-        return 1;
-    }
 
-    // START THE EXPOSURE!!!!
-    if (ASIStartExposure(camera_info.CameraID, ASI_FALSE) != ASI_SUCCESS) {
-        cerr << "Error starting exposure" << endl;
-        return 1;
-    }
-
-    // Wait for camera to take exposure
-    while (true) {
-        ASIGetExpStatus(camera_info.CameraID, &asi_exp_status);
-        if (asi_exp_status == ASI_EXP_SUCCESS) {
-            cout << "Successfully took exposure" << endl;
-            break;
+        try {
+            exposure_seconds = stod(argv[1]);
         }
-        else if (asi_exp_status == ASI_EXP_FAILED) {
-            cerr << "Exposure capture failed" << endl;
+        catch (...) {
+            cerr << "Invalid exposure time: "
+                 << argv[1]
+                 << endl;
+
+            ASICloseCamera(camera_info.CameraID);
+
             return 1;
         }
     }
 
-    // Retrieve exposure data
-    vector<unsigned char> asi_image(image_size);
-    if (ASIGetDataAfterExp(camera_info.CameraID, asi_image.data(), image_size) != ASI_SUCCESS) {
-        cerr << "Error reading exposure data" << endl;
+    if (exposure_seconds <= 0) {
+
+        cerr << "Exposure time must be greater than 0."
+             << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
         return 1;
     }
 
-    // Generate a filename with the current date and time
-    time_t now = time(0);
+    long exposure_time =
+        static_cast<long>(exposure_seconds * 1000000.0);
+
+    cout << "Set exposure time: "
+         << exposure_seconds
+         << " seconds"
+         << endl;
+
+    if (ASISetControlValue(
+            camera_info.CameraID,
+            ASI_EXPOSURE,
+            exposure_time,
+            ASI_FALSE) != ASI_SUCCESS) {
+
+        cerr << "Error setting exposure time" << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
+        return 1;
+    }
+
+    // Start exposure
+    cout << "Starting exposure..." << endl;
+
+    if (ASIStartExposure(
+            camera_info.CameraID,
+            ASI_FALSE) != ASI_SUCCESS) {
+
+        cerr << "Error starting exposure" << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
+        return 1;
+    }
+
+    // Wait for exposure to finish
+    while (true) {
+
+        if (ASIGetExpStatus(
+                camera_info.CameraID,
+                &asi_exp_status) != ASI_SUCCESS) {
+
+            cerr << "Error checking exposure status"
+                 << endl;
+
+            ASICloseCamera(camera_info.CameraID);
+
+            return 1;
+        }
+
+        if (asi_exp_status == ASI_EXP_SUCCESS) {
+
+            cout << "Successfully took exposure"
+                 << endl;
+
+            break;
+        }
+
+        if (asi_exp_status == ASI_EXP_FAILED) {
+
+            cerr << "Exposure capture failed"
+                 << endl;
+
+            ASICloseCamera(camera_info.CameraID);
+
+            return 1;
+        }
+    }
+
+    // Retrieve complete image data
+    vector<unsigned char> asi_image(image_size);
+
+    cout << "Retrieving image data..." << endl;
+
+    if (ASIGetDataAfterExp(
+            camera_info.CameraID,
+            asi_image.data(),
+            image_size) != ASI_SUCCESS) {
+
+        cerr << "Error reading exposure data"
+             << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
+        return 1;
+    }
+
+    cout << "Successfully retrieved "
+         << asi_image.size()
+         << " bytes"
+         << endl;
+
+    // Generate timestamped filename
+    time_t now = time(nullptr);
+
     tm *ltm = localtime(&now);
+
     stringstream filename;
-    filename << "image_data-" 
-             << 1900 + ltm->tm_year << "_" 
-             << setfill('0') << setw(2) << 1 + ltm->tm_mon << "_"
-             << setfill('0') << setw(2) << ltm->tm_mday << "_"
-             << setfill('0') << setw(2) << ltm->tm_hour 
-             << setfill('0') << setw(2) << ltm->tm_min 
-             << setfill('0') << setw(2) << ltm->tm_sec 
-             << "-" << exposure_seconds << "s"
-             << ".txt";
 
-    // Print the first few bytes of exposure data
-    cout << "Image data (first 20 bytes): " << endl;
-    for (int i = 0; i < 20; i++)
-    {
-        cout << static_cast<int>(asi_image[i]) << " ";
+    filename << "image_data-"
+             << 1900 + ltm->tm_year
+             << "_"
+             << setfill('0')
+             << setw(2)
+             << 1 + ltm->tm_mon
+             << "_"
+             << setfill('0')
+             << setw(2)
+             << ltm->tm_mday
+             << "_"
+             << setfill('0')
+             << setw(2)
+             << ltm->tm_hour
+             << setfill('0')
+             << setw(2)
+             << ltm->tm_min
+             << setfill('0')
+             << setw(2)
+             << ltm->tm_sec
+             << "-"
+             << fixed
+             << setprecision(1)
+             << exposure_seconds
+             << "s.raw";
+
+    // Print first 20 bytes
+    cout << "\nImage data (first 20 bytes):"
+         << endl;
+
+    for (int i = 0; i < 20 && i < static_cast<int>(asi_image.size()); ++i) {
+
+        cout << "0x"
+             << hex
+             << setw(2)
+             << setfill('0')
+             << static_cast<int>(asi_image[i])
+             << " ";
     }
-    cout << endl;
 
-    // Save data to a .txt file
-    ofstream myfile(filename.str());
-    if (myfile.is_open()) {
-        
-        // Write camera properties to the file
-        myfile << "Camera properties:\n";
-        myfile << "Name: " << camera_info.Name << "\n";
-        myfile << "Camera ID: " << camera_info.CameraID << "\n";
-        myfile << "Width & Height: " << camera_info.MaxWidth << " x " << camera_info.MaxHeight << "\n";
-        myfile << "Color: " << (camera_info.IsColorCam == ASI_TRUE ? "Yes" : "No") << "\n";
-        myfile << "  Bayer pattern: " << camera_info.BayerPattern << "\n";
-        myfile << "  Pixel size: " << camera_info.PixelSize << " microns\n";
-        myfile << "  e-/ADU: " << camera_info.ElecPerADU << "\n";
-        myfile << "  Bit depth: " << camera_info.BitDepth << "\n";
-        myfile << "  Trigger cam: " << (camera_info.IsTriggerCam ? "Yes" : "No") << "\n\n";
+    cout << dec << endl;
 
-        // Write camera controls to file
-        myfile << "Camera controls:" << endl;
-        for (int i = 0; i < asi_num_controls; ++i) {
-            ASI_CONTROL_CAPS control_caps;
-            if (ASIGetControlCaps(camera_info.CameraID, i, &control_caps) == ASI_SUCCESS) {
-                myfile << "  Property " << control_caps.Name << ": [" 
-                    << control_caps.MinValue << ", " << control_caps.MaxValue 
-                    << "] = " << control_caps.DefaultValue
-                    << (control_caps.IsWritable ? " (set)" : "") 
-                    << " - " << control_caps.Description << endl;
-            }    
-        }
-        myfile << endl;
+    // Save COMPLETE image buffer
+    ofstream image_file(
+        filename.str(),
+        ios::binary
+    );
 
-        // Write exposure time to file
-        myfile << "Exposure time: " << exposure_time / 1000000.0 << " seconds" << endl;
+    if (!image_file.is_open()) {
 
-        // Write image data to file
-        myfile << "First 20 bytes (hexadecimal):" << endl;
-        // for (unsigned long i = 0; i < asi_image.size(); ++i) {     // Uncomment to output full byte data 
-        for (unsigned long i = 0; i < 20; ++i) {
-            myfile << "0x" << hex << setw(2) << setfill('0') << static_cast<int>(asi_image[i]) << " ";
-        }
-        myfile.close();
-        cout << "Data saved to " << filename.str() << " in hexadecimal format" << endl;
-    } else {
-        cerr << "Unable to open file";
+        cerr << "Unable to open output file: "
+             << filename.str()
+             << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+
+        return 1;
     }
+
+    image_file.write(
+        reinterpret_cast<const char *>(asi_image.data()),
+        asi_image.size()
+    );
+
+    image_file.close();
+
+    cout << "\nFull image data saved to:"
+         << endl;
+
+    cout << "  " << filename.str()
+         << endl;
+
+    cout << "File size: "
+         << asi_image.size()
+         << " bytes"
+         << endl;
 
     // Close camera
-    cout << "Closing camera" << endl;
+    cout << "\nClosing camera" << endl;
     ASICloseCamera(camera_info.CameraID);
-
+    cout << "Done." << endl;
     return 0;
 }
