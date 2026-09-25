@@ -129,6 +129,22 @@ int main(int argc, char *argv[]) {
         ASICloseCamera(camera_info.CameraID);
         return 1;
     }
+    // Explicitly set the camera output format to RGB24
+    cout << "Setting image format to RGB24..." << endl;
+
+    if (ASISetROIFormat(
+            camera_info.CameraID,
+            camera_info.MaxWidth,
+            camera_info.MaxHeight,
+            1,
+            ASI_IMG_RGB24) != ASI_SUCCESS) {
+
+        cerr << "Error setting image format to RGB24" << endl;
+        ASICloseCamera(camera_info.CameraID);
+        return 1;
+    }
+
+    cout << "Image format: RGB24" << endl;
 
     // Get camera controls
     int asi_num_controls = 0;
@@ -401,6 +417,43 @@ int main(int argc, char *argv[]) {
          << asi_image.size()
          << " bytes"
          << endl;
+
+    // Save RGB24 buffer as a viewable PPM image
+    string ppm_filename = filename.str();
+    size_t raw_extension = ppm_filename.rfind(".raw");
+
+    if (raw_extension != string::npos) {
+        ppm_filename.replace(raw_extension, 4, ".ppm");
+    }
+
+    ofstream ppm_file(ppm_filename, ios::binary);
+
+    if (!ppm_file.is_open()) {
+
+        cerr << "Unable to open PPM output file: "
+            << ppm_filename
+            << endl;
+
+        ASICloseCamera(camera_info.CameraID);
+        return 1;
+    }
+
+    // PPM header
+    ppm_file << "P6\n";
+    ppm_file << camera_info.MaxWidth << " "
+            << camera_info.MaxHeight << "\n";
+    ppm_file << "255\n";
+
+    // RGB24 pixel data
+    ppm_file.write(
+        reinterpret_cast<const char *>(asi_image.data()),
+        asi_image.size()
+    );
+
+    ppm_file.close();
+
+    cout << "Viewable PPM image saved to:" << endl;
+    cout << "  " << ppm_filename << endl;
 
     // Close camera
     cout << "\nClosing camera" << endl;
